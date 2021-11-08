@@ -1,14 +1,21 @@
 const router = require('express').Router();
-const {
-  checkUsernameExists,
-  isRealUser,
-} = require('../middleware/auth-middleware.js');
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../secrets/');
+const {
+  uniqueUsername,
+  userExists,
+} = require('../middleware/auth-middleware.js');
+const { add } = require('./authModel');
 
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+router.post('/register', uniqueUsername, async (req, res) => {
+  const user = req.body;
+  const hash = bcrypt.hashSync(user.password, 8);
+
+  user.password = hash;
+
+  const newUser = await add(user);
+  res.status(201).json(newUser);
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -36,8 +43,10 @@ router.post('/register', (req, res) => {
   */
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post('/login', userExists, async (req, res) => {
+  const token = buildToken(req.user);
+
+  res.status(200).json({ message: `welcome, ${req.user.username}`, token });
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -62,5 +71,18 @@ router.post('/login', (req, res) => {
       the response body should include a string exactly as follows: "invalid credentials".
   */
 });
+
+const buildToken = (user) => {
+  const payload = {
+    id: user.id,
+    username: user.username,
+  };
+
+  const options = {
+    expiresIn: '1d',
+  };
+
+  return jwt.sign(payload, JWT_SECRET, options);
+};
 
 module.exports = router;
